@@ -1,0 +1,159 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+##Empirical power of $T_{RW}${#simStudyPowerLargeSample}
+```{r power-simulation-setting,echo=FALSE, warnings=FALSE,message=F}
+source("./binaryReponse_NI_EQ.R")
+marginX = 0.262
+alpha = 0.05
+nRep = 10^5
+nT = seq(50,500,by=50)
+nR = nT
+
+cleanRun = F
+
+```
+
+
+```{r power-tryLoad,message=F}
+fileStr=paste0("binaryResponse_EQ_simulation_PowerStudy_nRep",nRep,".rda")
+if(cleanRun){ 
+  dateStr = format(Sys.time(), '%Y-%m-%d')
+  message("cleanRun = TRUE, I'll rerun the simulation on ",dateStr, ", nRep: ",nRep, ".")
+}else{ 
+  message(paste0("cleanRun = FALSE, I'll load the data from ", fileStr))#ET_BR_simulation_nRep",nRep,".rda"))
+  load(fileStr) #once loaded, cleanRun is overwritten as TRUE 
+  cleanRun=FALSE
+  message("The loaded simulation results were obtained on ", dateStr)
+}
+```
+
+```{r power-study,results='asis'}
+if(cleanRun)
+{
+  #Power study only report EQ_RW
+  muR_Seq = c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9)
+  nMuR_Seq = length(muR_Seq)
+  marginSeq = marginX*sqrt(muR_Seq*(1-muR_Seq))
+  srrPower = list()
+  deltaSeq = seq(-1,1,by=0.25) #(0,0.25,0.5,0.75,1,0.75,0.5,0.25,0)#,2,length.out = 5)
+  
+  for(i in 1:nMuR_Seq)
+  {
+    muT_Seq = seq(muR_Seq[i]-marginSeq[i],muR_Seq[i]+marginSeq[i],length.out = 9)
+    tmpPowerList=list()
+    for(j in 1:length(muT_Seq))
+    {
+      tmpPowerList[[j]] = simulateEQRejectionRate(nT,nR,muT_Seq[j],muR_Seq[i],marginX,alpha,nRep)
+      message(paste0("This part of simulation is done in ", tmpPowerList[[j]]$timeDuration, " seconds, at ", format(Sys.time(), "%Y-%m-%d:%X"), "."))
+      #print(tmpPowerList[[j]]$summaryStatistics_xtable, scalebox=0.7, caption.placement = "bottom")   
+    }
+    srrPower[[i]] = tmpPowerList
+  }
+  
+  powerArray = sapply(1:nMuR_Seq,FUN=function(i){
+    sapply(1:9,FUN=function(j){
+      cbind(#srrPower[[i]][[j]]$summaryRslt["NI_MLE_W_rslt",], 
+            #srrPower[[i]][[j]]$NI_W_MLE_TRR,
+            #srrPower[[i]][[j]]$summaryRslt["NI_W_rslt",], 
+            #srrPower[[i]][[j]]$NI_W_TRR,
+            #srrPower[[i]][[j]]$summaryRslt["EQ_MLE_W_rslt",], 
+            #srrPower[[i]][[j]]$EQ_W_MLE_TRR, 
+            srrPower[[i]][[j]]$summaryRslt["EQ_RW_rslt",], 
+            srrPower[[i]][[j]]$EQ_RW_TRR)
+      },simplify="array")
+    },simplify="array")
+  
+  dimnames(powerArray)[[1]] = paste0("n",nR)
+  dimnames(powerArray)[[2]] = c(#"NI_MLE_W_ERR", "NI_MLE_W_TRR","NI_W_ERR","NI_W_TRR", "EQ_MLE_W_ERR", "EQ_MLE_W_TRR", 
+    "EQ_RW_ERR", "EQ_RW_TRR")
+  dimnames(powerArray)[[3]] = paste0("delta",deltaSeq) 
+  dimnames(powerArray)[[4]] = paste0("muR",muR_Seq)
+  save.image(fileStr)
+}
+
+```
+
+
+
+Due to the inferior performance of $T_{MWO}$ and $T_{RWO}$ in controlling type I error, only $T_{RW}$ is considered in the power study. 
+The simulation settings for power function of large sample studies are similar to those in Section \@ref(simStudytypeIErrorLargeSample). 
+For any $p_T \in [p_R-\delta,p_R+\delta]$, its deviation from $H_0$ can be measured by $\Delta = \frac{p_T - p_R}{\delta}\in[-1,1]$, interpreted as the signed distance between the test probability $p_T$ and $H_0$ standardized by $\delta$. 
+The reference probability $p_R$ is from $0.1$ to $0.9$ with increment of $0.1$. 
+For each $p_R$, we consider a series of $p_T$'s with the corresponding $\Delta$ from $-1$ to $1$ with an increasement of $0.25$. 
+In particular, $\Delta=\pm 1$ implies that the test response rate is at the $H_0$ boundary and $\Delta=0$ implies that the test and reference response rates are identical.
+ 
+<!--Because the results are similar across different $p_R$ values, only the case for $p_R=0.2$ is reported and shown in Fig. \@ref(fig:plotEQPower). 
+-->
+
+The simulation results are illustrated in Fig. \@ref(fig:plotEQPower). The power for $n=50$ is virtually 0 for all combinations of true test and reference probability. 
+This is due to the small $k$ value.
+For a fixed $p_R$, the power in general increases as sample size increases and $p_T$ is closer to $p_R$. However the power curves seem to be asymmetric at $\Delta=0$, which is due to the variance components of the margin variability and unseen for equivalence test with a fixed margin. The only case for a symmetric power curve is when $p_R=0.5$. For $p\ne 0.5$, the power curves for $p_R=p$ seems to the power curves for $p_R=1-p$ flipped at $\Delta=0$. 
+
+<!--
+[=============== Insert Fig. \@ref(fig:plotEQPower) here. ===============]
+-->
+
+```{r plotEQPower,eval=T,fig.show='hold',out.width='50%',fig.cap=paste0("The empirical and theoretical power functions for $T_{RW}$ with $k = 0.262$. The empirical rejection rates are illustrated by lines with solid circles and the theoretical rejection rates by lines only. The results for different sample sizes are shown in different lines."),out.extra=''}
+signedDeltaSeq = seq(-1,1,by=0.25)
+#for(i in 1:nMuR_Seq)
+#for(i in c(1,9,2,8,3,7,4,6,5))
+for(i in c(1,9,2,8,4,6,5))
+{
+  matplot(signedDeltaSeq,t(powerArray[c(1:5,9),2,,i]),ylim=c(0,1),ylab="Rejection rate",xlab=expression(paste(Delta, " (", frac(p[T] - (p[R] - delta), delta), ")")),type="l",main=substitute(paste(p[R],"=",x),list(x=muR_Seq[i])))
+  par(new=TRUE)
+  matplot(signedDeltaSeq,t(powerArray[c(1:5,9),1,,i]),ylim=c(0,1),ylab="",xlab="",type="b",pch=16)
+  abline(h=seq(0,1,by=0.05),v=seq(-1,1,by=0.25),col="gray",lty=3)
+  legend("topright",legend = paste0("n=",c(seq(50,250,50),500)), lty = 1:6,col=1:6)
+ #dev.off()
+}
+if(F)
+{
+i=1
+matplot(signedDeltaSeq,t(powerArray[1:5,2,,i]),xlim=c(-1,1),ylim=c(0,1),ylab="Rejection rate",xlab=expression(paste(Delta, " (", frac(p[T] - (p[R] - delta), delta), ")")),type="l")
+par(new=TRUE)
+
+matplot(signedDeltaSeq,t(powerArray[1:5,1,,i]),ylim=c(0,1),ylab="",xlab="",type="b",pch=1)
+abline(h=seq(0,1,by=0.05),v=seq(-1,1,by=0.25),col="gray",lty=3)
+legend("topright",legend = paste0("n=",seq(50,250,50)), lty = 1:5,col=1:5)
+
+i=5
+
+matplot(signedDeltaSeq,t(powerArray[1:5,1,,i]),ylim=c(0,1),ylab="",xlab="",type="b",pch=1)
+abline(h=seq(0,1,by=0.05),v=seq(-1,1,by=0.25),col="gray",lty=3)
+legend("topright",legend = paste0("n=",seq(50,250,50)), lty = 1:5,col=1:5)
+}
+ 
+```
+
+<!--
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=\textwidth]{M1_power_RMLE_muR0_2.pdf}
+\label{M1_power_RMLE_muR0_2}
+\caption{Power function of $T_{RW}$ for different $p_R$ values. }
+\end{center} 
+\end{figure} 
+-->
+
+<!--
+Fig. \@ref(fig:plotNIRMLEPower) shows that the power increases as $\Delta$ increases, and the empirical and theoretical power functions agree with each other very well for different sample sizes, and they are almost indistinguishable for $n \ge 150$.
+
+
+##Small Sample Type I Error Studies{#simStudyTypeIErrorStudySmallSample}
+The simulation settings for small sample are similar to that of the large sample except for that $p_R=0.2$ is not studied, because when $p_R=0.2$, the significance level $\alpha=0.5$, and the power is set to be $1-\beta=0.9$, the margin $\delta=(Z_{0.95}+Z_{0.9})*\sqrt{\frac{2}{50}\cdot 0.2(1-0.2)} \approx 0.2341$, which is greater than $0.2$. Therefore, we start at $p_R=0.3$. The empirical rejection rate (ERR) and estimated theoretical rejection rate (TRR) are illustrated in Figure \ref{M2_typeI_error}. 
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=\textwidth]{M2_30_typeI_error} 
+\label{M2_typeI_error}
+\caption{The Rejection Rates for both empirical and theoretical studies. }
+\end{center} 
+\end{figure} 
+
+The results have the same pattern as the large sample type I error studies. For the two naive approaches, both ERR and TRR are smaller than the nominal size for all $p_R$ except for $p_R=0.5$. The deviation from the nominal size increases as $p_R$ deviates from 0.5. For $p_R=0.3$, the simulation results show that both ERR and TRR are less than 0.02. This is largely because of the fact that $\nu_2$ is smaller than $\nu_1$ when $p_R$ is less than 0.5, and this lowers the rejection probability. Note that $p_R=0.5$ is an exception is because $\nu_2=\nu_1$ at $p_R=0.5$. Thus, the two naive test statistics are not recommended with respect to their ability of controlling type I error. 
+
+-->

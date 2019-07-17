@@ -1,0 +1,184 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+##Empirical type I error{#simStudytypeIErrorLargeSample}
+
+```{r typeIerrorLargeSampleSimulationSetting,echo=FALSE, warnings=FALSE,message=FALSE}
+source("./binaryReponse_NI_EQ.R")
+marginX = 0.262
+alpha = 0.05
+nRep = 10^6
+nT = seq(50,500,by=50)
+nR = nT
+cleanRun = F
+```
+
+
+```{r tryLoad,message=FALSE}
+fileStr=paste0("binaryResponse_EQ_simulation_typeIErrorStudy_nRep",nRep,".rda")
+
+if(cleanRun){ 
+  dateStr = format(Sys.time(), '%Y-%m-%d')
+  message("cleanRun = TRUE, I'll rerun the simulation on ",dateStr, ", nRep: ",nRep, ".")
+}else{ 
+  message(paste0("cleanRun = FALSE, I'll load the data from ", fileStr))#ET_BR_simulation_nRep",nRep,".rda"))
+  load(fileStr) #once loaded, cleanRun is overwritten as TRUE 
+  cleanRun=FALSE
+  message("The loaded simulation results were obtained on ", dateStr)
+} 
+    
+```
+
+```{r typeIError,results='asis'}
+#compare Type 1 error
+if(cleanRun)
+{
+  muR_Seq = c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9)
+  nMuR_Seq = length(muR_Seq)
+  marginSeq = marginX*sqrt(muR_Seq*(1-muR_Seq))
+  muT_Seq = muR_Seq - marginSeq
+  
+  nSeq = length(muR_Seq)
+  srr = list()
+  for(i in 1:nSeq)
+  {
+    srr[[i]] = simulateEQRejectionRate(nT,nR,muT_Seq[i],muR_Seq[i],marginX,alpha,nRep)
+    message(paste0("This part of simulation is done in ", srr[[i]]$timeDuration, " seconds."))
+    #print(srr[[i]]$summaryStatistics_xtable, scalebox=0.7, caption.placement = "bottom")   
+  }
+  
+  typeI_Error = sapply(1:nSeq,FUN=function(i){cbind(srr[[i]]$summaryRslt["EQ_MWO_rslt",],  
+                                                    srr[[i]]$summaryRslt["EQ_RWO_rslt",], 
+                                                    srr[[i]]$summaryRslt["EQ_RW_rslt",],
+                                                    srr[[i]]$EQ_RW_TRR
+                                                     )},
+                       simplify="array")
+  
+  dimnames(typeI_Error)[[2]] = c("EQ_MWO_ERR","EQ_RWO_ERR", "EQ_RW_ERR","EQ_RW_TRR")
+  dimnames(typeI_Error)[[3]] = paste0("muR",muR_Seq)
+}
+```
+
+```{r RejectionRates,eval=F,results='asis'}
+#,results='asis'} 
+# NI_MLE_WO_ERR_xtable = xtable(NI_EmpiricalRRseq_MLE_WO, 
+#                           caption = 'Empirical rejection rates for the MLE NI test without adjusting margin variance.', 
+#                           digits=tableDigits, 
+#                           table.placement ="!h",
+#                           label="tab:NI_MLE_WO_ERR")
+
+for(i in 1:nSeq)
+{
+   RR = xtable(t(typeI_Error[,,i]), 
+                             caption = paste0('Various rejection rates for $\\mu_T=$ ',muT_Seq[i], " and $\\mu_R=$ ",muR_Seq[i], "."), 
+                             digits=tableDigits, 
+                             table.placement ="!h",
+                             label=paste0("tab:RR",i)
+                             )
+  print(RR)  
+}
+
+``` 
+
+
+
+```{r typeIErrorAdditional,eval=FALSE,results='asis'}
+#compare Type 1 error
+if(cleanRun)
+{
+  muR_Seq = c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9)
+  nMuR_Seq = length(muR_Seq)
+  marginSeq = marginX*sqrt(muR_Seq*(1-muR_Seq))
+  muT_Seq = muR_Seq + marginSeq
+  nT = seq(100,300,by=100)
+  nR = nT 
+  nSeq = length(muR_Seq)
+  srr = list()
+  for(i in 1:nSeq)
+  {
+    srr[[i]] = simulateEQRejectionRate(nT,nR,muT_Seq[i],muR_Seq[i],marginX,alpha,nRep)
+    message(paste0("This part of simulation is done in ", srr[[i]]$timeDuration, " seconds."))
+    #print(srr[[i]]$summaryStatistics_xtable, scalebox=0.7, caption.placement = "bottom")   
+  }
+  
+  typeI_ErrorAdditional = sapply(1:nSeq,FUN=function(i){cbind(srr[[i]]$summaryRslt["EQ_MWO_rslt",],  
+                                                    srr[[i]]$summaryRslt["EQ_RWO_rslt",], 
+                                                    srr[[i]]$summaryRslt["EQ_RW_rslt",],
+                                                    srr[[i]]$EQ_RW_TRR
+                                                     )},
+                       simplify="array")
+  
+  dimnames(typeI_ErrorAdditional)[[2]] = c("EQ_MWO_ERR","EQ_RWO_ERR", "EQ_RW_ERR","EQ_RW_TRR")
+  dimnames(typeI_ErrorAdditional)[[3]] = paste0("muR",muR_Seq)
+  
+  matplot(muR_Seq,t(typeI_ErrorAdditional['nT200nR200',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=200")))
+legend("bottomright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+
+}
+```
+
+
+```{r saveData} 
+#save.image(resultFile)
+if(cleanRun) 
+  save.image(fileStr)
+```
+Here we report a simulation study of the empirical type I error of the three test statistics in large sample studies with $k = 0.262$.
+<!--Note that the value of $k$ does not affect the simulation results.-->
+We assume equal sample size for both arms, and consider a variety of sample sizes, $n_T =     
+an_R=50,100,\cdots,500$ and the true reference probability $p_R                           =0.1,0.2,...,0.9$.
+For each $p_R$, the margin and true $p_T$ are given by $\delta(p_R)=k\sqrt{p_R(1-p_R)}$ and $p_T = p_R - \delta(p_R)$ respectively.
+For given sample size and true response rates, the test and reference data are simulated by $X_{I,i} \sim \mathrm{Bernoulli}(p_I)$ for $i=1,...,n_I$, and $I=T,R$. 
+Three non-inferiority tests based on test statistics $T_{RWO}$, $T_{MWO}$, and $T_{RW}$ are performed for each simulated sample at a nominal level of $\alpha=0.05$. 
+The simulation study is replicated for $10^6$ times. 
+
+The performances of the three tests are similar when sample sizes changes, so only empirical rejection rates (ERR) (type I errors) for $T_{RWO}$, $T_{MWO}$, and $T_{RW}$ and theoretical rejection rates (TRR) for $T_{RW}$ are reported in Figure \@ref(fig:plotEQTypeIError) for the case when $n_T=n_R=50,100,150,200,250, 500$. 
+When sample size is 50, all tests have almost zero rejection rate, regardless the true reference probability. This is due to the small sample size and the small $k$ value.
+When sample size is 100, the rejection rates are around 0.03.
+Note that the theorectical rejection rate for $T_{RW}$ is also close to 0.03. 
+The rejection rates for sample sizes at least 150 are similar across different sample sizes, showing that both $T_{RWO}$ and $T_{MWO}$ have seriously bias in type I error, compared with $T_{RW}$ for which both the empirical type I error and theoretical approximations are much closer to the nomial 0.05 level. 
+
+The evident bias in $T_{RWO}$ and $T_{MWO}$ is mainly due to the variance estimate ignoring the variability in the margin. 
+The uprising trend cross the 0.05 nominal size at $p_R=0.5$ may be explained below. First note that the simulation study is set at the lower boundary $p_T - p_R = -\delta$. Thus the sample estimate $\hat{p}_I$ is close to the RMLE $\check{p}_{1,I}$,  both of which are consistent estimators of $p_{I}$ for $I=T,R$. This is the reason for the comparable rejection rates of $T_{RWO}$ and $T_{MWO}$. Also, $H_{2,0}$ is almost always rejected. So the type I error of the equivalence test is close to the rejection rate of $H_{1,0}$. 
+For this selected $k$ and any $\check{p}_{1,R}<1/2$, $\nu_1(\check{p}_{1,T},\check{p}_{1,R}) > \nu_{1,2}(\check{p}_{1,T},\check{p}_{1,R})$, implying $T_{1,RWO} < T_{1,RW}$ and thus $T_{1,RWO}$ rejects $H_{1,0}$ less frequently than $T_{1,RW}$. 
+
+Additional simulation study conducted with $p_T = p_R + \delta(p_R)$ unreported here shows a mirrored pattern for $T_{MWO}$ and $T_{RWO}$, of which the type I error has a downward trend.
+
+<!--
+[============== Insert Fig.  \@ref(fig:typeIErrorFigure) here. ===============]
+
+```{r plotEQTypeIErrorPDF,fig.show='hold',out.width='50%',fig.cap=paste0("The empirical and theoretical rejection rates for equivalence tests.")}
+```
+-->
+
+```{r plotEQTypeIError,eval=TRUE,fig.show='hold',out.width='50%',fig.ncol=3,fig.cap=paste0("The empirical and theoretical rejection rates for equivalence tests.")}
+
+
+matplot(muR_Seq,t(typeI_Error['nT50nR50',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=50")))
+legend("topright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+cat("\n\n")
+
+matplot(muR_Seq,t(typeI_Error['nT100nR100',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=100")))
+legend("bottomright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+
+cat("\n\n")
+matplot(muR_Seq,t(typeI_Error['nT150nR150',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=150")))
+legend("bottomright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+
+cat("\n\n")
+matplot(muR_Seq,t(typeI_Error['nT200nR200',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=200")))
+legend("bottomright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+
+cat("\n\n")
+matplot(muR_Seq,t(typeI_Error['nT250nR250',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=250")))
+legend("bottomright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+
+cat("\n\n")
+matplot(muR_Seq,t(typeI_Error['nT500nR500',,]),type="b",lty=c(1,2,3,4),pch=c(15,16,17,18),xlab=expression(p[R]),ylim=c(0,0.075),ylab="Type I error",main=expression(paste(n[T],"=",n[R],"=500")))
+legend("bottomright", legend = c("MWO_ERR","MW_ERR","RW_ERR","RW_TRR"),lty=c(1,2,3,4),pch=c(15,16,17,18),col=1:4)
+
+cat("\n\n")
+
+```
